@@ -29,9 +29,9 @@ export default function IngredientInput({ onAnalyze, isLoading }: IngredientInpu
       // Clean up extracted text
       const cleanedText = extractedText
         .replace(/\n/g, " ") // Replace newlines with spaces
-        .replace(/[^a-zA-Z0-9,.:;()[\]\s-]/g, "") // Remove weird symbols
+        .replace(/[^a-zA-Z0-9,.:;()[\]\s-]/g, " ") // Replace weird symbols with spaces instead of stripping (preserves numbers better)
         .replace(/\s+/g, " ") // Collapse multiple spaces
-        .replace(/^(ingredients|agredients|contains|may contain)[:\s]+/i, "") // Strip leading headers
+        .replace(/^(ingredients|agredients|contains|may contain|label|nutrition|facts)[:\s]+/i, "") // Strip leading headers
         .trim();
 
       setText(cleanedText);
