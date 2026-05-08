@@ -24,115 +24,104 @@ export async function POST(req: NextRequest) {
 }
 
 async function analyzeIngredients(text: string) {
-  const ingredientsList = text.split(/[,.;\n]/).map(i => i.trim()).filter(Boolean);
+  // Normalize and split ingredients
+  const rawList = text.split(/[,.;\n]|\band\b/i).map(i => i.trim()).filter(Boolean);
 
-  const findings = ingredientsList.map(ing => {
+  const cleanKeywords = [
+    "oat", "almond", "blueberry", "water", "honey", "spinach", "kale", "apple", "banana", "chicken", "beef", "fish",
+    "salmon", "egg", "rice", "quinoa", "olive oil", "coconut oil", "broccoli", "carrot", "walnut", "pecan", "sea salt",
+    "pepper", "garlic", "onion", "lemon", "lime", "orange", "strawberry", "raspberry", "avocado", "tomato", "potato",
+    "sweet potato", "black bean", "lentil", "chickpea", "milk", "yogurt", "butter"
+  ];
+
+  const processedKeywords = [
+    "maltodextrin", "soy lecithin", "xanthan gum", "carrageenan", "guar gum", "natural flavor", "artificial flavor",
+    "canola oil", "soybean oil", "sunflower oil", "corn oil", "sugar", "dextrose", "sucrose", "modified food starch"
+  ];
+
+  const flaggedKeywords = [
+    "aspartame", "e951", "high fructose corn syrup", "hfcs", "red 40", "e129", "sodium nitrite", "e250",
+    "sodium nitrate", "e251", "bha", "bht", "potassium bromate", "yellow 5", "yellow 6", "blue 1"
+  ];
+
+  const ingredients = rawList.map(ing => {
     const lowerIng = ing.toLowerCase();
 
-    // Additives
-    if (lowerIng.includes("aspartame") || lowerIng.includes("e951")) {
+    // FLAGGED CHECK
+    if (flaggedKeywords.some(k => lowerIng.includes(k))) {
       return {
         name: ing,
-        impact: "Harmful",
-        score: "D",
-        effect: "Artificial sweetener. May cause headaches, dizziness, and is linked to various health concerns in long-term studies.",
-        category: "Additives"
-      };
-    }
-    if (lowerIng.includes("high fructose corn syrup") || lowerIng.includes("hfcs")) {
-      return {
-        name: ing,
-        impact: "Harmful",
-        score: "E",
-        effect: "Linked to obesity, insulin resistance, and increased risk of type 2 diabetes.",
-        category: "Sugars"
-      };
-    }
-    if (lowerIng.includes("monosodium glutamate") || lowerIng.includes("msg") || lowerIng.includes("e621")) {
-      return {
-        name: ing,
-        impact: "Moderate",
-        score: "C",
-        effect: "Flavor enhancer. Some people may experience sensitivity (headaches, flushing).",
-        category: "Flavor Enhancers"
-      };
-    }
-    if (lowerIng.includes("palm oil")) {
-      return {
-        name: ing,
-        impact: "Moderate",
-        score: "C",
-        effect: "High in saturated fats. Environmental concerns regarding deforestation.",
-        category: "Fats"
-      };
-    }
-    if (lowerIng.includes("sodium nitrite") || lowerIng.includes("e250")) {
-      return {
-        name: ing,
-        impact: "Harmful",
-        score: "E",
-        effect: "Preservative used in processed meats. Linked to increased risk of certain cancers.",
-        category: "Preservatives"
-      };
-    }
-    if (lowerIng.includes("red 40") || lowerIng.includes("e129")) {
-      return {
-        name: ing,
-        impact: "Harmful",
-        score: "D",
-        effect: "Artificial color. Linked to hyperactivity in children and potential allergic reactions.",
-        category: "Colors"
-      };
-    }
-    if (lowerIng.includes("titanium dioxide") || lowerIng.includes("e171")) {
-      return {
-        name: ing,
-        impact: "Harmful",
-        score: "D",
-        effect: "Whitening agent. Banned in EU due to concerns about genotoxicity.",
-        category: "Colors"
-      };
-    }
-    if (lowerIng.includes("potassium bromate") || lowerIng.includes("e924")) {
-      return {
-        name: ing,
-        impact: "Harmful",
-        score: "E",
-        effect: "Flour improver. Classified as a possible human carcinogen.",
-        category: "Additives"
-      };
-    }
-    if (lowerIng.includes("bha") || lowerIng.includes("e320") || lowerIng.includes("butylated hydroxyanisole")) {
-      return {
-        name: ing,
-        impact: "Harmful",
-        score: "D",
-        effect: "Antioxidant preservative. Linked to hormone disruption and potential carcinogenicity.",
-        category: "Preservatives"
+        classification: "flagged",
+        body: "Some studies have examined possible associations between certain artificial additives and inflammatory responses in some individuals.",
+        health: "Nutritional literature has associated long-term consumption of various synthetic additives with areas of ongoing research regarding metabolic health.",
+        mind: "Some researchers are exploring how certain artificial compounds might interact with neurological focus and mood patterns."
       };
     }
 
+    // CLEAN CHECK (Prioritize clean over processed for things like "Organic Sugar" - though sugar is usually processed)
+    if (cleanKeywords.some(k => lowerIng.includes(k)) && !processedKeywords.some(k => lowerIng.includes(k))) {
+      return {
+        name: ing,
+        classification: "clean",
+        body: "Recognized in nutritional research for providing essential nutrients or fiber that support digestive health.",
+        health: "Multiple studies have associated whole food ingredients with supportive roles in cardiovascular and immune function.",
+        mind: "Associated in nutritional literature with providing stable energy release, which some researchers link to sustained focus."
+      };
+    }
+
+    // PROCESSED CHECK
+    if (processedKeywords.some(k => lowerIng.includes(k))) {
+      return {
+        name: ing,
+        classification: "processed",
+        body: "This ingredient is often used as a stabilizer or sweetener. Some research suggests monitoring the intake of refined items for optimal digestive balance.",
+        health: "Certain studies have examined possible associations between highly processed ingredients and gut microbiome health.",
+        mind: "Some individuals report experiencing energy fluctuations after consuming high-glycemic or refined additives."
+      };
+    }
+
+    // DEFAULT (Unclassified/Neutral)
     return {
       name: ing,
-      impact: "Safe",
-      score: "A",
-      effect: "Information for this specific ingredient is not yet in our prioritized database. Most natural ingredients are safe, but check for personal allergies.",
-      category: "Pending Verification"
+      classification: "pending",
+      body: "Further verification of this specific ingredient's source is needed for a precise classification. Generally, whole-food sources are preferred.",
+      health: "The impact of this ingredient depends on its concentration and processing level. Research on minor additives is ongoing.",
+      mind: "Nutritional researchers generally suggest that a diet focused on verified whole foods may support cognitive wellness."
     };
   });
 
-  const harmfulCount = findings.filter(f => f.impact === "Harmful").length;
-  const moderateCount = findings.filter(f => f.impact === "Moderate").length;
+  const clean_count = ingredients.filter(f => f.classification === "clean").length;
+  const processed_count = ingredients.filter(f => f.classification === "processed").length;
+  const flagged_count = ingredients.filter(f => f.classification === "flagged").length;
+  const pending_count = ingredients.filter(f => f.classification === "pending").length;
 
-  let overallScore = "A";
-  if (harmfulCount > 2) overallScore = "E";
-  else if (harmfulCount > 0) overallScore = "D";
-  else if (moderateCount > 2) overallScore = "C";
-  else if (moderateCount > 0) overallScore = "B";
+  let grade = "C";
+  let grade_reason = "This product contains a mix of ingredients. Moderation and focus on whole foods are generally suggested by nutritional researchers.";
+
+  if (flagged_count === 0 && processed_count === 0 && clean_count > 0) {
+    grade = "A";
+    grade_reason = "This product appears to have a very clean, whole-food profile based on available research.";
+  } else if (flagged_count === 0 && processed_count <= 2) {
+    grade = "B";
+    grade_reason = "This product has a largely clean profile with minimal processed items that some research suggests monitoring.";
+  } else if (flagged_count > 2 || (flagged_count > 0 && processed_count > 5)) {
+    grade = "F";
+    grade_reason = "This product's ingredient profile contains multiple additives that nutritional researchers generally recommend limiting.";
+  } else if (flagged_count > 0) {
+    grade = "D";
+    grade_reason = "This product's ingredient profile contains certain additives that ongoing research continues to examine closely.";
+  }
 
   return {
-    score: overallScore,
-    findings,
-    summary: `Found ${harmfulCount} harmful and ${moderateCount} moderate ingredients.`
+    product_name: "Analyzed Product",
+    grade,
+    grade_reason,
+    vitality_summary: `Analysis: ${clean_count} Clean, ${processed_count} Processed, ${flagged_count} Flagged, and ${pending_count} Pending Verification.`,
+    clean_count,
+    processed_count,
+    flagged_count,
+    pending_count,
+    advice: "Consider focusing on whole, minimally processed foods to support long-term wellness. Consider consulting a healthcare professional for personalized dietary guidance.",
+    ingredients
   };
 }
