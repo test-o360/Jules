@@ -25,59 +25,73 @@ export async function POST(req: NextRequest) {
 
 async function analyzeIngredients(text: string) {
   // Normalize and split ingredients
-  const rawList = text.split(/[,.;\n]|\band\b/i).map(i => i.trim()).filter(Boolean);
+  // Improved splitting to handle nested lists, colons, and common OCR noise
+  const rawList = text
+    .split(/[,.;\n]|\band\b|[:()\[\]]/i)
+    .map(i => i.trim())
+    .filter(i => i.length > 1 && !/^(ingredients|agredients|contains|may contain|label|nutrition|facts)$/i.test(i));
 
   const cleanKeywords = [
     "oat", "almond", "blueberry", "water", "honey", "spinach", "kale", "apple", "banana", "chicken", "beef", "fish",
     "salmon", "egg", "rice", "quinoa", "olive oil", "coconut oil", "broccoli", "carrot", "walnut", "pecan", "sea salt",
-    "pepper", "garlic", "onion", "lemon", "lime", "orange", "strawberry", "raspberry", "avocado", "tomato", "potato",
-    "sweet potato", "black bean", "lentil", "chickpea", "milk", "yogurt", "butter"
+    "salt", "pepper", "garlic", "onion", "lemon", "lime", "orange", "strawberry", "raspberry", "avocado", "tomato", "potato",
+    "sweet potato", "black bean", "lentil", "chickpea", "milk", "yogurt", "butter", "wheat", "flour", "cocoa", "vanilla",
+    "cinnamon", "nutmeg", "ginger", "turmeric", "broccoli", "cauliflower", "asparagus", "corn"
   ];
 
   const processedKeywords = [
     "maltodextrin", "soy lecithin", "xanthan gum", "carrageenan", "guar gum", "natural flavor", "artificial flavor",
-    "canola oil", "soybean oil", "sunflower oil", "corn oil", "sugar", "dextrose", "sucrose", "modified food starch"
+    "canola oil", "soybean oil", "sunflower oil", "corn oil", "palm oil", "vegetable oil", "sugar", "dextrose", "sucrose",
+    "modified food starch", "yeast extract", "msg", "monosodium glutamate", "corn syrup", "fructose", "lecithin",
+    "cellulose gum", "pectin", "citric acid", "ascorbic acid"
   ];
 
   const flaggedKeywords = [
     "aspartame", "e951", "high fructose corn syrup", "hfcs", "red 40", "e129", "sodium nitrite", "e250",
-    "sodium nitrate", "e251", "bha", "bht", "potassium bromate", "yellow 5", "yellow 6", "blue 1"
+    "sodium nitrate", "e251", "bha", "bht", "potassium bromate", "yellow 5", "yellow 6", "blue 1", "hydrogenated",
+    "partially hydrogenated", "acesulfame potassium", "sucralose", "saccharin"
   ];
 
   const ingredients = rawList.map(ing => {
     const lowerIng = ing.toLowerCase();
 
     // FLAGGED CHECK
-    if (flaggedKeywords.some(k => lowerIng.includes(k))) {
-      return {
-        name: ing,
-        classification: "flagged",
-        body: "Some studies have examined possible associations between certain artificial additives and inflammatory responses in some individuals.",
-        health: "Nutritional literature has associated long-term consumption of various synthetic additives with areas of ongoing research regarding metabolic health.",
-        mind: "Some researchers are exploring how certain artificial compounds might interact with neurological focus and mood patterns."
-      };
-    }
-
-    // CLEAN CHECK (Prioritize clean over processed for things like "Organic Sugar" - though sugar is usually processed)
-    if (cleanKeywords.some(k => lowerIng.includes(k)) && !processedKeywords.some(k => lowerIng.includes(k))) {
-      return {
-        name: ing,
-        classification: "clean",
-        body: "Recognized in nutritional research for providing essential nutrients or fiber that support digestive health.",
-        health: "Multiple studies have associated whole food ingredients with supportive roles in cardiovascular and immune function.",
-        mind: "Associated in nutritional literature with providing stable energy release, which some researchers link to sustained focus."
-      };
+    for (const k of flaggedKeywords) {
+      if (lowerIng.includes(k)) {
+        return {
+          name: ing,
+          classification: "flagged",
+          body: "Some studies have examined possible associations between certain artificial additives and inflammatory responses in some individuals.",
+          health: "Nutritional literature has associated long-term consumption of various synthetic additives with areas of ongoing research regarding metabolic health.",
+          mind: "Some researchers are exploring how certain artificial compounds might interact with neurological focus and mood patterns."
+        };
+      }
     }
 
     // PROCESSED CHECK
-    if (processedKeywords.some(k => lowerIng.includes(k))) {
-      return {
-        name: ing,
-        classification: "processed",
-        body: "This ingredient is often used as a stabilizer or sweetener. Some research suggests monitoring the intake of refined items for optimal digestive balance.",
-        health: "Certain studies have examined possible associations between highly processed ingredients and gut microbiome health.",
-        mind: "Some individuals report experiencing energy fluctuations after consuming high-glycemic or refined additives."
-      };
+    for (const k of processedKeywords) {
+      if (lowerIng.includes(k)) {
+        return {
+          name: ing,
+          classification: "processed",
+          body: "This ingredient is often used as a stabilizer, sweetener, or refined oil. Some research suggests monitoring the intake of highly refined items for optimal digestive balance.",
+          health: "Certain studies have examined possible associations between highly processed ingredients and gut microbiome health.",
+          mind: "Some individuals report experiencing energy fluctuations after consuming high-glycemic or refined additives."
+        };
+      }
+    }
+
+    // CLEAN CHECK
+    for (const k of cleanKeywords) {
+      if (lowerIng.includes(k)) {
+        return {
+          name: ing,
+          classification: "clean",
+          body: "Recognized in nutritional research for providing essential nutrients or fiber that support digestive health.",
+          health: "Multiple studies have associated whole food ingredients with supportive roles in cardiovascular and immune function.",
+          mind: "Associated in nutritional literature with providing stable energy release, which some researchers link to sustained focus."
+        };
+      }
     }
 
     // DEFAULT (Unclassified/Neutral)

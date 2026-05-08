@@ -28,8 +28,10 @@ export default function IngredientInput({ onAnalyze, isLoading }: IngredientInpu
 
       // Clean up extracted text
       const cleanedText = extractedText
-        .replace(/\n/g, " ")
-        .replace(/\s+/g, " ")
+        .replace(/\n/g, " ") // Replace newlines with spaces
+        .replace(/[^a-zA-Z0-9,.:;()[\]\s-]/g, "") // Remove weird symbols
+        .replace(/\s+/g, " ") // Collapse multiple spaces
+        .replace(/^(ingredients|agredients|contains|may contain)[:\s]+/i, "") // Strip leading headers
         .trim();
 
       setText(cleanedText);
